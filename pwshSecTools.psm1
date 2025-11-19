@@ -94,7 +94,8 @@ function Remove-SecureFile {
         .PARAMETER Passes
             Number of overwrite passes (default = 3).
         .EXAMPLE
-            Remove-SecureFile -Path "C:\secret\passwords.txt" -Passes 5
+           Remove-SecureFile -Path "C:\path\to\sensitive-file.txt" -Passes 5
+
     #>
 
   param(
