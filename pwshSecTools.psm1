@@ -30,8 +30,12 @@ function Invoke-FullDefenderScan {
     return
   }
   $timestamp = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
-  Write-Host "Starting Defender FullScan at $timestamp..." -ForegroundColor DarkCyan
+  Write-Host "Starting Defender FullScan at $timestamp..." -ForegroundColor Cyan
+  
   & $scriptPath
+
+  $exitcode=$LASTEXITCODE
+  Write-Host "...Scan completed with (exit code: $($exitcode))" -ForegroundColor DarkCyan
 }
 
 # --- 2. Secure wipe via PeaZip + random rename ----------------------------

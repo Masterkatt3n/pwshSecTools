@@ -21,11 +21,35 @@ function Log {
 
 Log "=== Starting Microsoft Defender FULL scan ==="
 
-# Log toast module import success
-if (Get-Module -ListAvailable -Name BurntToast) {
-  Log "BurntToast module found; toast notifications available"
+# Check Execution Policy and(will install) toast notification module
+$ep = Get-ExecutionPolicy -List | Out-String
+Log "Execution Policy:`n$ep"
+
+$toastOn = $false
+if (-not(Get-Module -ListAvailable -Name BurntToast)) {
+  try {
+    Install-Module BurntToast `
+      -Scope CurrentUser `
+      -Force `
+      -Confirm:$false `
+      -ErrorAction Stop
+    $toastOn = $true
+    Log "Notification module sucessfully installed"
+  } catch {
+    Log "Failed to install BurntToast: $($_.Exception.Message)"
+  }
 } else {
-  Log "BurntToast module not found; toast notifications disabled"
+  try {
+    Import-Module BurntToast -ErrorAction Stop
+    $toastOn = $true
+    Show-Toast `
+      -Title "✔ Defender Full Scan: Running..." `
+      -Message "BurntToast module enabled, proceeding with Full Scan..."
+    Log "ToastNotify enabled"
+
+  } catch {
+    Log "BurntToast present but failed to import: $($_.Exception.Message)"
+  }
 }
 
 # Snapshot before scan
@@ -33,8 +57,15 @@ $statusBefore = Get-MpComputerStatus
 Log "Engine: $($statusBefore.AMEngineVersion)"
 Log "Last full scan: $($statusBefore.FullScanEndTime)"
 
+# If multiple sessions, cleanup before moving on
+Get-Job -Name 'DefenderScanHeartbeat' -ErrorAction SilentlyContinue |
+  Stop-Job -ErrorAction SilentlyContinue
+
+Get-Job -Name 'DefenderScanHeartbeat' -ErrorAction SilentlyContinue |
+  Remove-Job -Force -ErrorAction SilentlyContinue
+
 # Heartbeat job
-$heartbeat = Start-Job -ScriptBlock {
+$heartbeat = Start-Job -Name 'DefenderScanHeartbeat' -ScriptBlock {
   param($startTime, $logFile)
   while ($true) {
     Start-Sleep -Seconds 60
@@ -51,9 +82,19 @@ try {
     -Wait `
     -ArgumentList '-NoProfile -Command "Start-MpScan -ScanType FullScan"'
 } finally {
-  # Stop heartbeat
-  Stop-Job $heartbeat -Force | Out-Null
-  Remove-Job $heartbeat | Out-Null
+  if ($heartbeat) {
+    try {
+      if ($heartbeat.State -ne 'Stopped') {
+        Stop-Job -Job $heartbeat | Out-Null
+      }
+    } catch {
+    }
+
+    try {
+      Remove-Job -Job $heartbeat -Force | Out-Null
+    } catch {
+    }
+  }
 }
 
 $scanEnd = Get-Date
@@ -85,6 +126,12 @@ if ($detections) {
   }
 } else {
   Log "No threat detections reported."
+}
+
+if (-not $detections -and $toastOn) {
+  Show-Toast `
+    -Title "✔ Defender Scan Complete" `
+    -Message "Full scan completed. No new threats detected."
 }
 
 Log "=== Defender full scan completed ==="
