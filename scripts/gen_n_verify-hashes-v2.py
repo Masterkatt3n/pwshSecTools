@@ -1,6 +1,6 @@
+import hashlib
 import os
 import sys
-import hashlib
 
 try:
     from tqdm import tqdm
