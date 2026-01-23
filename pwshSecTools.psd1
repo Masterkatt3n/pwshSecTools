@@ -12,7 +12,6 @@
         "Remove-SecureFile",
         "Clear-RecentItem",
         "Update-pwshSecToolsModule",
-        "Test-pwshSecToolsSetup",
-        "Get-Dezipped"
+        "Test-pwshSecToolsSetup"
     )
 }

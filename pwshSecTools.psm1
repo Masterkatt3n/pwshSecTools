@@ -38,60 +38,7 @@ function Invoke-FullDefenderScan {
     Write-Host "...Scan completed with (exit code: $($exitcode))" -ForegroundColor DarkCyan
 }
 
-# --- 2. Allround unzipper func using PeaZip ------------------------------
-function Get-Dezipped {
-    <#
-.SYNOPSIS
-  Extract archives using PeaZip.
-
-.DESCRIPTION
-  Opens archive files with PeaZip in extraction mode.
-
-.PARAMETER Path
-  One or more archive files to extract.
-
-.EXAMPLE
-  Get-Dezipped archive.zip
-#>
-
-    param(
-        [Parameter(Mandatory, ValueFromPipeline)]
-        [string[]]$Path
-    )
-
-    $peaPath = "C:\Program Files\PeaZip\peazip.exe"
-
-    if (-not (Test-Path $peaPath)) {
-        throw "PeaZip not found at $peaPath"
-    }
-
-    foreach ($archive in $Path) {
-        if (-not (Test-Path $archive)) {
-            Write-Warning "File not found: $archive"
-            continue
-        }
-
-        Write-Host "Decompressing $archive ..." -ForegroundColor Cyan
-
-        try {
-            $arguments = "-ext2open `"$archive`""
-
-            $process = Start-Process `
-                -FilePath $peaPath `
-                -ArgumentList $arguments `
-                -Wait `
-                -PassThru `
-                -NoNewWindow
-
-            Write-Host "✔ Done (exit code: $($process.ExitCode))" -ForegroundColor Green
-        } catch {
-            Write-Host "✖ Failed: $archive" -ForegroundColor Red
-        }
-    }
-}
-Set-Alias -Name dzip -Value Get-Dezipped
-
-# --- 3. Secure wipe via PeaZip + random rename ----------------------------
+# --- 2. Secure wipe via PeaZip + random rename ----------------------------
 function Invoke-PeaPurge {
     param(
         [Parameter(Mandatory)][ValidateSet("very_fast", "fast", "medium", "slow", "very_slow")]
@@ -127,7 +74,7 @@ function Invoke-PeaPurge {
     }
 }
 
-# --- 4. Random rename utility --------------------------------------------
+# --- 3. Random rename utility --------------------------------------------
 function Rename-Random {
     param([Parameter(Mandatory)][string]$Path)
     $renameScript = Join-Path $PSScriptRoot 'scripts/rename_files.py'
@@ -138,7 +85,7 @@ function Rename-Random {
     python $renameScript $Path
 }
 
-# --- 5. Secure file deletion -----------------------------------------------
+# --- 4. Secure file deletion -----------------------------------------------
 function Remove-SecureFile {
     <#
         .SYNOPSIS
@@ -185,7 +132,7 @@ function Remove-SecureFile {
     }
 }
 
-# --- 6. Clear Recent Items & Jump Lists ------------------------------------
+# --- 5. Clear Recent Items & Jump Lists ------------------------------------
 function Clear-RecentItem {
     <#
         .SYNOPSIS
@@ -221,7 +168,7 @@ function Clear-RecentItem {
     }
 }
 
-# --- 7. Sync helper scripts ----------------------------------------------
+# --- 6. Sync helper scripts ----------------------------------------------
 function Update-pwshSecToolsModule {
     $srcPS = Join-Path $HOME 'Documents\PS-skripts\profileScripts'
     $srcPy = Join-Path $HOME 'Documents\py-scripts\profileScripts'
@@ -251,7 +198,7 @@ function Update-pwshSecToolsModule {
     Write-Host "Update complete." -ForegroundColor Yellow
 }
 
-# --- 8. Environment test -------------------------------------------------
+# --- 7. Environment test -------------------------------------------------
 function Test-pwshSecToolsSetup {
     $paths = @{
         "Defender script" = Join-Path $PSScriptRoot 'scripts/RunDefenderFullScan.ps1'
@@ -281,7 +228,5 @@ function Test-pwshSecToolsSetup {
 Export-ModuleMember -Function `
     Invoke-FullDefenderScan, Invoke-PeaPurge, Rename-Random, `
     Remove-SecureFile, Clear-RecentItem, `
-    Update-pwshSecToolsModule, Test-pwshSecToolsSetup, `
-    Get-Dezipped `
-    -Alias dzip
+    Update-pwshSecToolsModule, Test-pwshSecToolsSetup `
 
