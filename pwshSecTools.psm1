@@ -41,35 +41,59 @@ function Invoke-FullDefenderScan {
 # --- 2. Secure wipe via PeaZip + random rename ----------------------------
 function Invoke-PeaPurge {
     param(
-        [Parameter(Mandatory)][ValidateSet("very_fast", "fast", "medium", "slow", "very_slow")]
+        [Parameter(Mandatory)]
+        [ValidateSet("very_fast", "fast", "medium", "slow", "very_slow")]
         [string]$Speed,
-        [Parameter(Mandatory)][string[]]$Path
+
+        [Parameter(Mandatory)]
+        [string[]]$Path
     )
 
     $peaPath = "C:\Program Files\PeaZip\pea.exe"
     $speedOption = "WIPE $($Speed.ToUpper())"
+    $renameScript = Join-Path $PSScriptRoot 'scripts/rename_files.py'
 
     foreach ($singlePath in $Path) {
+
         $timestamp = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
+
         if (-not (Test-Path $singlePath)) {
             Write-Warning "Path not found: $singlePath"
             continue
         }
+
+        $singlePath = (Resolve-Path $singlePath).Path
 
         if ($singlePath -match '^(C:\\$|C:\\Windows(\\|$)|C:\\Program Files(\\|$))') {
             Write-Error "Refusing to wipe critical system path: $singlePath"
             continue
         }
 
-        for ($i = 1; $i -le 5; $i++) {
-            Write-Host "[$singlePath] Renaming files - Pass $i of 5..." -ForegroundColor DarkRed
-            $renameScript = Join-Path $PSScriptRoot 'scripts/rename_files.py'
-            python $renameScript $singlePath
+        $isDirectory = Test-Path $singlePath -PathType Container
+
+        if ($isDirectory) {
+
+            for ($i = 1; $i -le 5; $i++) {
+                Write-Host "[$singlePath] Renaming files - Pass $i of 5..." -ForegroundColor DarkRed
+                python $renameScript $singlePath
+            }
+
+        } else {
+
+            $random = -join ((65..90 + 97..122 + 48..57) | Get-Random -Count 8 | ForEach-Object { [char]$_ })
+            $ext = [System.IO.Path]::GetExtension($singlePath)
+            $newPath = Join-Path (Split-Path $singlePath) "$random$ext"
+
+            Rename-Item $singlePath $newPath
+            $singlePath = $newPath
         }
 
         $arguments = "$speedOption `"$singlePath`""
+
         Write-Host "Wiping [$singlePath] with speed: $Speed at $timestamp..." -ForegroundColor Magenta
+
         $process = Start-Process -FilePath $peaPath -ArgumentList $arguments -NoNewWindow -Wait -PassThru
+
         Write-Host "...Wipe completed with exit code: $($process.ExitCode)" -ForegroundColor DarkCyan
     }
 }
