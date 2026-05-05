@@ -8,31 +8,34 @@ except ImportError:
     tqdm = None
 
 try:
-    import blake3
-
-    USE_BLAKE3 = True
+    import blake3 as _blake3
 except ImportError:
-    USE_BLAKE3 = False
+    _blake3 = None
+
+USE_BLAKE3 = _blake3 is not None
 
 CHUNK_SIZE = 1024 * 1024  # 1MB
 
 
 def calculate_file_hash(file_path, hash_algorithm="sha256"):
-    if USE_BLAKE3 and hash_algorithm.lower() == "blake3":
-        h = blake3.blake3()
+    algo = hash_algorithm.lower()
+
+    if _blake3 is not None and algo == "blake3":
+        h = _blake3.blake3()
+
     else:
         try:
-            h = hashlib.new(hash_algorithm)
+            h = hashlib.new(algo)
         except ValueError:
             print(f"Unsupported hash algorithm: {hash_algorithm}", file=sys.stderr)
             sys.exit(1)
 
-    with open(file_path, "rb") as f:
-        while True:
-            chunk = f.read(CHUNK_SIZE)
-            if not chunk:
-                break
-            h.update(chunk)
+    try:
+        with open(file_path, "rb") as f:
+            while chunk := f.read(CHUNK_SIZE):
+                h.update(chunk)
+    except OSError as e:
+        raise RuntimeError(f"I/O error while reading {file_path}: {e}") from e
 
     return h.hexdigest()
 
@@ -60,8 +63,8 @@ def get_all_file_hashes(directory, output_file, hash_algorithm="sha256"):
             try:
                 file_hash = calculate_file_hash(file_path, hash_algorithm)
                 relative_path = os.path.relpath(file_path, directory)
-                out_file.write(f"{file_hash}  *{relative_path}\n")
-            except Exception as e:
+                out_file.write(f"{relative_path}\t{file_hash}\n")
+            except (RuntimeError, OSError) as e:
                 print(f"Failed to hash {file_path}: {e}", file=sys.stderr)
 
     if not tqdm or file_count == 1:
@@ -75,8 +78,12 @@ def get_all_file_hashes(directory, output_file, hash_algorithm="sha256"):
 def verify_hashes(directory, hash_file, hash_algorithm="sha256"):
     try:
         with open(hash_file, "r", encoding="utf-8") as f:
-            entries = [line.strip().split("\t") for line in f if "\t" in line]
-    except Exception as e:
+            entries = []
+            for line in f:
+                parts = line.strip().split("\t")
+                if len(parts) == 2:
+                    entries.append(parts)
+    except OSError as e:
         print(f"Failed to read hash file: {e}", file=sys.stderr)
         sys.exit(1)
 
@@ -91,6 +98,7 @@ def verify_hashes(directory, hash_file, hash_algorithm="sha256"):
 
     for rel_path, expected_hash in iterator:
         file_path = os.path.join(directory, rel_path)
+
         if not os.path.isfile(file_path):
             print(f"Missing: {rel_path}")
             missing += 1
@@ -103,7 +111,7 @@ def verify_hashes(directory, hash_file, hash_algorithm="sha256"):
             else:
                 print(f"Mismatch: {rel_path}")
                 fail += 1
-        except Exception as e:
+        except (RuntimeError, OSError) as e:
             print(f"Error hashing {rel_path}: {e}", file=sys.stderr)
             fail += 1
 
@@ -111,11 +119,7 @@ def verify_hashes(directory, hash_file, hash_algorithm="sha256"):
         f"\nVerification complete: {success} OK, {fail} mismatched, {missing} missing, total {total}"
     )
 
-    # Return success/fail counts as exit code guidance
-    if fail > 0 or missing > 0:
-        sys.exit(1)
-    else:
-        sys.exit(0)
+    sys.exit(1 if (fail > 0 or missing > 0) else 0)
 
 
 def print_usage():
