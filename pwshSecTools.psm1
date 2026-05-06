@@ -29,9 +29,29 @@ function Invoke-FullDefenderScan {
         Write-Warning "Defender scan script not found at $scriptPath"
         return
     }
+
+    $cacheDir = Join-Path $env:XDG_CACHE_HOME 'scanstats'
+    $cacheFile = Join-Path $cacheDir 'fd_count.txt'
+
+    if (-not (Test-Path $cacheDir)) {
+        New-Item -ItemType Directory -Path $cacheDir -Force | Out-Null
+    }
+
+    if (Get-Command fd -ErrorAction SilentlyContinue) {
+        try {
+            $count = (fd -tf -H C:\ 2>$null | Measure-Object -Line).Lines
+            "$((Get-Date).ToString('yyyy-MM-dd HH:mm:ss'))|$count" |
+                Set-Content $cacheFile
+
+            Write-Host "Cached file count updated ($count files)" -ForegroundColor DarkGreen
+        } catch {
+            Write-Warning "Failed generating cached file count"
+        }
+    }
+
     $timestamp = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
     Write-Host "Starting Defender FullScan at $timestamp..." -ForegroundColor Cyan
-  
+
     & $scriptPath
 
     $exitcode = $LASTEXITCODE
@@ -180,10 +200,10 @@ function Clear-RecentItem {
     try {
         Write-Host "Clearing Recent Items and Jump Lists..." -ForegroundColor DarkYellow
         if (Test-Path $recentPath) {
-            Remove-Item "$recentPath\*" -Force -Recurse -ErrorAction SilentlyContinue 
+            Remove-Item "$recentPath\*" -Force -Recurse -ErrorAction SilentlyContinue
         }
         if (Test-Path $jumpListPath) {
-            Remove-Item "$jumpListPath\*" -Force -Recurse -ErrorAction SilentlyContinue 
+            Remove-Item "$jumpListPath\*" -Force -Recurse -ErrorAction SilentlyContinue
         }
 
         Write-Host "✓ Cleared Recent Items and Jump Lists." -ForegroundColor Green
@@ -201,9 +221,9 @@ function Update-pwshSecToolsModule {
 
     foreach ($f in $files) {
         $src = if ($f -like '*.py') {
-            Join-Path $srcPy $f 
+            Join-Path $srcPy $f
         } else {
-            Join-Path $srcPS $f 
+            Join-Path $srcPS $f
         }
         $dst = Join-Path $dstDir $f
         if (Test-Path $src) {

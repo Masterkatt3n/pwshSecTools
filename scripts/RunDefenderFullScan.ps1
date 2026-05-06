@@ -21,6 +21,36 @@ function Log {
 
 Log "=== Starting Microsoft Defender FULL scan ==="
 
+Log "=== System snapshot ==="
+
+# CPU
+$cpu = Get-CimInstance Win32_Processor | Select-Object -First 1
+Log "CPU: $($cpu.Name) ($($cpu.NumberOfLogicalProcessors) threads)"
+
+# Volumes
+Get-Volume |
+    Where-Object { $_.Size -gt 5GB } |
+    ForEach-Object {
+        $used = [math]::Round(($_.Size - $_.SizeRemaining) / 1GB, 1)
+        $size = [math]::Round($_.Size / 1GB, 1)
+        $pct = [math]::Round((($($_.Size - $_.SizeRemaining) / $_.Size) * 100), 1)
+
+        Log ("Drive {0}: {1}/{2} GB used ({3}%)" -f $_.DriveLetter, $used, $size, $pct)
+    }
+
+# Optional cached file count
+$cacheFile = "$env:XDG_CACHE_HOME\scanstats\fd_count.txt"
+
+if (Test-Path $cacheFile) {
+    try {
+        $cached = Get-Content $cacheFile -ErrorAction Stop
+        Log "Cached file count: $cached"
+    } catch {
+        Log "Failed reading cached file count"
+    }
+}
+
+Log "======================="
 # Check Execution Policy and(will install) toast notification module
 $ep = Get-ExecutionPolicy -List | Out-String
 Log "Execution Policy:`n$ep"
