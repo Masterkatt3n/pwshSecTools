@@ -39,7 +39,10 @@ function Invoke-FullDefenderScan {
 
     if (Get-Command fd -ErrorAction SilentlyContinue) {
         try {
-            $count = (fd -tf -H C:\ 2>$null | Measure-Object -Line).Lines
+            $count = (
+                fd -tf -H . 'C:\' 2>$null |
+                    Measure-Object
+            ).Count
             "$((Get-Date).ToString('yyyy-MM-dd HH:mm:ss'))|$count" |
                 Set-Content $cacheFile
 
